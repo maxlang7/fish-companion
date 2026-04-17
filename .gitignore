@@ -1,0 +1,16 @@
+# Environments
+.venv/
+venv/
+ENV/
+
+# Nix
+.nix-node/
+shell.nix.lock
+# Optional: ignore shell.nix if it's purely for your local setup
+# and not shared with the team
+# shell.nix
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
