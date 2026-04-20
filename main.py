@@ -4,6 +4,7 @@ import speech_recognition as sr
 from thefuzz import process
 import sys
 import os
+import time
 from datetime import datetime
 import tests
 
@@ -17,6 +18,14 @@ Required Libraries:
 
 Setup an OpenAI key with export OPENAI_API_KEY="ssh-000000"
 """
+
+# AI
+class GameLogger:
+    def __init__(self):
+        self.directory = "games"
+        if not os.path.exists(self.directory):
+            os.makedirs(self.directory)
+        self.filename = self._get_filename()
 
     def _get_filename(self):
         date_str = datetime.now().strftime("%Y-%m-%d")
@@ -119,9 +128,16 @@ def isIllegalAsk(ask):
         return True
 
     # 2. Must have at least one card in the set to ask for another
-    set_values = list(asker.information[card_set].values())
-    if set_values.count(1) == 0:
-        print(f"Illegal: {asker.name} has no cards in {card_set}")
+    # We only block if we are CERTAIN they have none (all marked -1)
+    set_info = asker.information[card_set]
+    has_possible_card = False
+    for status in set_info.values():
+        if status != -1:
+            has_possible_card = True
+            break
+
+    if not has_possible_card:
+        print(f"Illegal: {asker.name} proven to have no cards in {card_set}")
         return True
 
     return False
@@ -148,33 +164,38 @@ class Listener:
                     model="gpt-4o-mini-transcribe",
                     prompt=f"Card game: literature. Keywords: {self.game_keywords}"
                 ).lower()
-                print(f"Heard: {text}")
+                print(f"Heard: '{text}'")
                 return self.parseText(text, current_asker)
-            except Exception as e:
+            except Exception:
                 return None
     # AI
     def parseText(self, text, current_asker):
         found_suit = None
         found_value = None
         found_player = None
-        confidence_threshold = 80
+        confidence_threshold = 70
 
         s_match, s_score = process.extractOne(text, self.suits)
-        if s_score > confidence_threshold: found_suit = s_match
+        if s_score >= confidence_threshold: found_suit = s_match
 
         v_match, v_score = process.extractOne(text, self.values)
-        if v_score > confidence_threshold: found_value = v_match
+        if v_score >= confidence_threshold: found_value = v_match
 
         p_match, p_score = process.extractOne(text, self.players)
-        if p_score > confidence_threshold:
+        if p_score >= confidence_threshold:
             for p in self.player_objects:
                 if p.name == p_match:
                     found_player = p
                     break
 
-        if all([found_suit, found_value, found_player]):
+        if found_suit is not None and found_value is not None and found_player is not None:
             found_card = Card(found_value, found_suit)
-            got_card = any(word in text for word in ['yes', 'got', 'here', 'have'])
+            # Simple heuristic for 'got it'
+            got_card = False
+            for word in ['yes', 'got', 'here', 'have']:
+                if word in text:
+                    got_card = True
+                    break
             return Ask(current_asker, found_player, found_card, got_card)
         return None
 
@@ -203,6 +224,7 @@ def background_listener(app):
     listener = Listener(app.players, app.values, app.suits)
     while app.isListening:
         if not app.useMic: continue
+
         result_ask = listener.listen(app.game.playerWithTurn)
         if result_ask:
             if not isIllegalAsk(result_ask):
@@ -216,27 +238,22 @@ def run_test_move(app, asker_idx, asked_idx, val, suit, got):
     if not isIllegalAsk(move):
         app.game.record_move(move)
         print(f"Test Move: {move}")
-    else:
-        print(f"Illegal Test Move: {move}")
 # AI
 def seed_card(player, val, suit):
     card = Card(val, suit)
     player.information[card.set][str(card)] = 1
-    print(f"Seeded: {player.name} now has {card}")
 # AI
 def run_automated_test(app, test_key):
     all_tests = tests.get_test_cases()
     if test_key in all_tests:
-        print(f"--- Running Automated Test: {test_key} ---")
+        print(f"--- Running Test: {test_key} ---")
         for action in all_tests[test_key]:
             if action[0] == 'seed':
-                _, p_idx, val, suit = action
-                seed_card(app.players[p_idx], val, suit)
+                seed_card(app.players[action[1]], action[2], action[3])
             elif action[0] == 'move':
-                _, asker_idx, asked_idx, val, suit, got = action
-                run_test_move(app, asker_idx, asked_idx, val, suit, got)
+                run_test_move(app, action[1], action[2], action[3], action[4], action[5])
     else:
-        print(f"Test case '{test_key}' not found. Available: {list(all_tests.keys())}")
+        print(f"Test '{test_key}' not found. Available: {list(all_tests.keys())}")
 
 def onAppStart(app):
     names, cards_by_set, app.values, app.suits = get_initial_data()
@@ -246,20 +263,28 @@ def onAppStart(app):
     app.isListening = True
     app.useMic = False
 
-    #AI
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             if not arg.startswith('-'):
                 run_automated_test(app, arg)
                 break
-#Ai
-    app.thread = threading.Thread(target=background_listener, args=(app,), daemon=True)
-    app.thread.start()
+
+    if not hasattr(app, 'thread') or not app.thread.is_alive():
+        app.thread = threading.Thread(target=background_listener, args=(app,), daemon=True)
+        app.thread.start()
+
 # AI
 def onKeyPress(app, key):
     if key == 'm':
         app.useMic = not app.useMic
-        print(f"Microphone: {'On' if app.useMic else 'Off'}")
+        print(f"Mic: {'On' if app.useMic else 'Off'}")
+    elif key == 'r':
+        onAppStart(app)
+        print("Game reset.")
+
+# DO NOT DELETE
+def onStep(app):
+    pass
 
 # AI (temporary)
 def redrawAll(app):
@@ -277,9 +302,8 @@ def redrawAll(app):
         drawLabel(str(app.game.asks[-1]), 200, 180, size=14)
     else:
         drawLabel("No moves recorded yet", 200, 180, size=14, italic=True)
-
     drawLabel("Controls:", 200, 280, size=14, bold=True)
-    drawLabel("'M' - Toggle Mic", 200, 310, size=12)
+    drawLabel("'M' - Toggle Mic | 'R' - Reset Game", 200, 310, size=12)
     drawLabel(f"Log: {app.game.logger.filename}", 200, 335, size=10, fill='grey')
 
 def main():

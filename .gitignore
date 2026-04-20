@@ -9,7 +9,7 @@ shell.nix.lock
 # Optional: ignore shell.nix if it's purely for your local setup
 # and not shared with the team
 # shell.nix
-
+key.txt
 # Python bytecode
 __pycache__/
 *.py[cod]

@@ -31,6 +31,9 @@ pkgs.mkShell {
     fi
     source .venv/bin/activate
 
+    # Set OpenAI API Key from key.txt
+    export OPENAI_API_KEY="${builtins.replaceStrings ["\n" "\r"] ["" ""] (builtins.readFile ./key.txt)}"
+
     echo "--- Cloud Speech-to-Text Environment Loaded ---"
     echo "Virtual environment (.venv) activated."
     echo "Run 'pip install cmu-graphics' to install it locally."

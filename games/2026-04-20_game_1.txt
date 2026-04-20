@@ -1,1 +1,4 @@
-[00:15:43] Max asked Alex for Four of Hearts and got it
+[00:43:41] Alex asked Max for Two of Hearts and got it
+[00:43:41] Alex asked Ben for Three of Hearts and didn't get it
+[00:43:41] Ben asked Max for Four of Hearts and didn't get it
+[00:43:41] Max asked Alex for Five of Hearts and got it
