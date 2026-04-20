@@ -119,8 +119,14 @@ class LiteratureGame:
 #Me (print statements are AI)
 def isIllegalAsk(ask):
     asker = ask.asker
+    asked = ask.asked
     card_str = str(ask.card)
     card_set = ask.card.set
+
+    # 0. Can't ask yourself
+    if asker == asked:
+        print(f"Illegal: {asker.name} asked themselves")
+        return True
 
     # 1. Can't ask for a card you already have
     if asker.information[card_set].get(card_str) == 1:

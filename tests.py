@@ -22,6 +22,10 @@ def get_test_cases():
             ('seed', 0, 'two', 'hearts'),
             ('move', 0, 2, 'five', 'hearts', False) # Should fail, turn moves to Ben
         ],
+        'ask_self': [
+            ('seed', 0, 'two', 'hearts'),
+            ('move', 0, 0, 'three', 'hearts', True) # Max asks Max (Illegal!)
+        ],
         'exhaust_set': [
             # Max starts with nothing in his set, we need to systematically prove he has NOTHING.
             # Low Hearts: two, three, four, five, six, seven
