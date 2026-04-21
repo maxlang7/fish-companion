@@ -17,6 +17,9 @@ Required Libraries:
 - thefuzz
 
 Setup an OpenAI key with export OPENAI_API_KEY="ssh-000000"
+
+
+minimax game tree heuristic with maximizing cards and information on opponents
 """
 
 # AI
@@ -71,6 +74,7 @@ class Player:
             set_name: { card: 0 for card in cards }
             for set_name, cards in cards_by_set.items()
         }
+        # maybe don't need
         self.knownSets = { set_name: 0 for set_name in cards_by_set.keys() }
 
     def __repr__(self):
@@ -98,6 +102,26 @@ class LiteratureGame:
         self.asks = []
         self.logger = GameLogger()
 
+    @staticmethod
+    def get_initial_data():
+        player_names = ['max', 'alex', 'ben', 'jack', 'kevin', 'darren']
+        suits_regular = ['hearts', 'diamonds', 'clubs', 'spades']
+        low_values = ['two', 'three', 'four', 'five', 'six', 'seven']
+        high_values = ['nine', 'ten', 'jack', 'queen', 'king', 'ace']
+
+        cards_by_set = {}
+        for suit in suits_regular:
+            cards_by_set[f'Low {suit.capitalize()}'] = [f"{v.capitalize()} of {suit.capitalize()}" for v in low_values]
+            cards_by_set[f'High {suit.capitalize()}'] = [f"{v.capitalize()} of {suit.capitalize()}" for v in high_values]
+
+        ej_cards = [f"Eight of {s.capitalize()}" for s in suits_regular] + ["Red Joker", "Black Joker"]
+        cards_by_set['Eights and Jokers'] = ej_cards
+
+        all_values = low_values + high_values + ['eight', 'joker'] + [str(i) for i in range(2, 11)]
+        all_suits = suits_regular + ['red', 'black']
+
+        return player_names, cards_by_set, all_values, all_suits
+
     def record_move(self, ask_object):
         self.asks.append(ask_object)
         self.logger.log_move(str(ask_object))
@@ -116,37 +140,40 @@ class LiteratureGame:
             asked.information[card_set][card_str] = -1
             asker.knownSets[card_set] = 1
             self.playerWithTurn = asked
-#Me (print statements are AI)
-def isIllegalAsk(ask):
-    asker = ask.asker
-    asked = ask.asked
-    card_str = str(ask.card)
-    card_set = ask.card.set
 
-    # 0. Can't ask yourself
-    if asker == asked:
-        print(f"Illegal: {asker.name} asked themselves")
-        return True
+class Analyzer:
+    @staticmethod
+    #Me
+    def isIllegalAsk(ask):
+        asker = ask.asker
+        asked = ask.asked
+        card_str = str(ask.card)
+        card_set = ask.card.set
 
-    # 1. Can't ask for a card you already have
-    if asker.information[card_set].get(card_str) == 1:
-        print(f"Illegal: {asker.name} already has {card_str}")
-        return True
+        # 0. Can't ask yourself
+        if asker == asked:
+            print(f"Illegal: {asker.name} asked themselves")
+            return True
 
-    # 2. Must have at least one card in the set to ask for another
-    # We only block if we are CERTAIN they have none (all marked -1)
-    set_info = asker.information[card_set]
-    has_possible_card = False
-    for status in set_info.values():
-        if status != -1:
-            has_possible_card = True
-            break
+        # 1. Can't ask for a card you already have
+        if asker.information[card_set].get(card_str) == 1:
+            print(f"Illegal: {asker.name} already has {card_str}")
+            return True
 
-    if not has_possible_card:
-        print(f"Illegal: {asker.name} proven to have no cards in {card_set}")
-        return True
+        # 2. Must have at least one card in the set to ask for another
+        # We only block if we are CERTAIN they have none (all marked -1)
+        set_info = asker.information[card_set]
+        has_possible_card = False
+        for status in set_info.values():
+            if status != -1:
+                has_possible_card = True
+                break
 
-    return False
+        if not has_possible_card:
+            print(f"Illegal: {asker.name} proven to have no cards in {card_set}")
+            return True
+
+        return False
 
 # mostly AI
 class Listener:
@@ -204,65 +231,49 @@ class Listener:
                     break
             return Ask(current_asker, found_player, found_card, got_card)
         return None
+    def background_listener(self, app):
+        while app.isListening:
+            if not app.useMic:
+                time.sleep(0.1)
+                continue
+
+            result_ask = self.listen(app.game.playerWithTurn)
+            if result_ask:
+                if not Analyzer.isIllegalAsk(result_ask):
+                    app.game.record_move(result_ask)
+
+class TestManager:
+    @staticmethod
+    def seed_card(player, val, suit):
+        card = Card(val, suit)
+        player.information[card.set][str(card)] = 1
+
+    @staticmethod
+    def run_test_move(app, asker_idx, asked_idx, val, suit, got):
+        asker = app.players[asker_idx]
+        asked = app.players[asked_idx]
+        card = Card(val, suit)
+        move = Ask(asker, asked, card, got)
+        if not Analyzer.isIllegalAsk(move):
+            app.game.record_move(move)
+            print(f"Test Move: {move}")
+
+    @staticmethod
+    def run_automated_test(app, test_key):
+        all_tests = tests.get_test_cases()
+        if test_key in all_tests:
+            print(f"--- Running Test: {test_key} ---")
+            for action in all_tests[test_key]:
+                if action[0] == 'seed':
+                    TestManager.seed_card(app.players[action[1]], action[2], action[3])
+                elif action[0] == 'move':
+                    TestManager.run_test_move(app, action[1], action[2], action[3], action[4], action[5])
+        else:
+            print(f"Test '{test_key}' not found. Available: {list(all_tests.keys())}")
 
 # --- Application Logic ---
-#AI
-def get_initial_data():
-    player_names = ['max', 'alex', 'ben', 'jack', 'kevin', 'darren']
-    suits_regular = ['hearts', 'diamonds', 'clubs', 'spades']
-    low_values = ['two', 'three', 'four', 'five', 'six', 'seven']
-    high_values = ['nine', 'ten', 'jack', 'queen', 'king', 'ace']
-
-    cards_by_set = {}
-    for suit in suits_regular:
-        cards_by_set[f'Low {suit.capitalize()}'] = [f"{v.capitalize()} of {suit.capitalize()}" for v in low_values]
-        cards_by_set[f'High {suit.capitalize()}'] = [f"{v.capitalize()} of {suit.capitalize()}" for v in high_values]
-
-    ej_cards = [f"Eight of {s.capitalize()}" for s in suits_regular] + ["Red Joker", "Black Joker"]
-    cards_by_set['Eights and Jokers'] = ej_cards
-
-    all_values = low_values + high_values + ['eight', 'joker'] + [str(i) for i in range(2, 11)]
-    all_suits = suits_regular + ['red', 'black']
-
-    return player_names, cards_by_set, all_values, all_suits
-# some AI
-def background_listener(app):
-    listener = Listener(app.players, app.values, app.suits)
-    while app.isListening:
-        if not app.useMic: continue
-
-        result_ask = listener.listen(app.game.playerWithTurn)
-        if result_ask:
-            if not isIllegalAsk(result_ask):
-                app.game.record_move(result_ask)
-# AI
-def run_test_move(app, asker_idx, asked_idx, val, suit, got):
-    asker = app.players[asker_idx]
-    asked = app.players[asked_idx]
-    card = Card(val, suit)
-    move = Ask(asker, asked, card, got)
-    if not isIllegalAsk(move):
-        app.game.record_move(move)
-        print(f"Test Move: {move}")
-# AI
-def seed_card(player, val, suit):
-    card = Card(val, suit)
-    player.information[card.set][str(card)] = 1
-# AI
-def run_automated_test(app, test_key):
-    all_tests = tests.get_test_cases()
-    if test_key in all_tests:
-        print(f"--- Running Test: {test_key} ---")
-        for action in all_tests[test_key]:
-            if action[0] == 'seed':
-                seed_card(app.players[action[1]], action[2], action[3])
-            elif action[0] == 'move':
-                run_test_move(app, action[1], action[2], action[3], action[4], action[5])
-    else:
-        print(f"Test '{test_key}' not found. Available: {list(all_tests.keys())}")
-
 def onAppStart(app):
-    names, cards_by_set, app.values, app.suits = get_initial_data()
+    names, cards_by_set, app.values, app.suits = LiteratureGame.get_initial_data()
     app.players = [Player(name, cards_by_set) for name in names]
     app.game = LiteratureGame(app.players)
 
@@ -272,11 +283,12 @@ def onAppStart(app):
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             if not arg.startswith('-'):
-                run_automated_test(app, arg)
+                TestManager.run_automated_test(app, arg)
                 break
 
     if not hasattr(app, 'thread') or not app.thread.is_alive():
-        app.thread = threading.Thread(target=background_listener, args=(app,), daemon=True)
+        app.listener = Listener(app.players, app.values, app.suits)
+        app.thread = threading.Thread(target=app.listener.background_listener, args=(app,), daemon=True)
         app.thread.start()
 
 # AI
