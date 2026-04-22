@@ -43,6 +43,14 @@ def get_test_cases():
             ('move', 0, 1, 'ace', 'spades', False),   # Max asks Alex (No). Turn to Alex.
             ('move', 1, 0, 'seven', 'hearts', False), # Alex asks Max (No). Turn to Max.
             # Max is now proven to have no cards in Low Hearts.
-            ('move', 0, 1, 'two', 'hearts', True)     # Max asks Alex (Illegal!)
+            ('move', 1, 0, 'two', 'hearts', True)     # Max asks Alex (Illegal!)
+        ],
+        'take_set': [
+            ('move', 0, 3, 'two', 'hearts', True),
+            ('move', 0, 3, 'three', 'hearts', True),
+            ('move', 0, 3, 'four', 'hearts', True),
+            ('move', 0, 3, 'five', 'hearts', True),
+            ('move', 0, 3, 'six', 'hearts', True),
+            ('move', 0, 3, 'seven', 'hearts', True)
         ]
     }
