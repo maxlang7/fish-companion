@@ -4,6 +4,7 @@ from datetime import datetime
 from models import Card, Player, Team, Ask
 from constants import valueMap, suitMap
 
+# Logger written by AI
 class GameLogger:
     logDir = "games"
 
@@ -31,17 +32,20 @@ class GameLogger:
 
 
 class LiteratureGame:
+    # names are AI generated
     botNames = [
         "Robo-Jack", "Byte-Ben", "Cyber-Alex", "Data-Kevin", "Circuit-Dan",
         "Silicon-Sam", "Logic-Leo", "Pixel-Pete"
     ]
 
-    def __init__(self, playerNames, botCards=None, doLog=True, shuffle=False):
+    # Part AI (built feature son top of what I made)
+    def __init__(self, playerNames, botCards=None, doLog=True, shuffle=False, oneSet=False):
         availableBotNames = list(self.botNames)
         random.shuffle(availableBotNames)
 
         self.players = []
-        for i, name in enumerate(playerNames):
+        for i in range(len(playerNames)):
+            name      = playerNames[i]
             isBot     = (name.lower() == 'bot')
             finalName = availableBotNames.pop() if isBot else name
             self.players.append(Player(finalName, i % 2, isBot=isBot))
@@ -57,26 +61,43 @@ class LiteratureGame:
         self.logger         = GameLogger(enabled=doLog)
         self.publicInfo     = self.buildPublicInfo()
 
-        if shuffle:
+        if oneSet:
+            self.dealTwoSets()
+        elif shuffle:
             self.dealShuffled()
         elif botCards:
             self.dealBotCards(botCards)
 
+    # Me
     def buildPublicInfo(self):
         info = {}
         for card in Card.getAllCards():
             info.setdefault(card.set, {})[card] = set(self.players)
         return info
 
+    # Next 8 functions AI
+    def printHands(self):
+        print("\n--- Hands ---")
+        for p in self.players:
+            def handSortKey(c):
+                return (c.set, c.value)
+            cards = ', '.join(str(c) for c in sorted(p.hand, key=handSortKey))
+            print(f"  {p.name}: {cards or '(empty)'}")
+        print()
+
+    def dealTwoSets(self):
+        testSets = {'Eights and Jokers', 'Low Hearts'}
+        cards = [c for c in Card.getAllCards() if c.set in testSets]
+        random.shuffle(cards)
+        for i in range(len(cards)):
+            self.players[i % 6].hand.add(cards[i])
+        self.printHands()
+
     def dealShuffled(self):
         allCards = Card.getAllCards()
         random.shuffle(allCards)
-        i = 0
-        for card in allCards:
-            player = self.players[i % 6]
-            player.hand.add(card)
-            self.publicInfo[card.set][card] = {player}
-            i += 1
+        for i in range(len(allCards)):
+            self.players[i % 6].hand.add(allCards[i])
 
     def dealBotCards(self, botCards):
         for pIdx, cards in botCards.items():
@@ -91,7 +112,6 @@ class LiteratureGame:
                 if val and suit:
                     card = Card(val, suit)
                     player.hand.add(card)
-                    self.publicInfo[card.set][card] = {player}
 
     @staticmethod
     def parseCardString(cStr):
@@ -101,6 +121,30 @@ class LiteratureGame:
             return valueMap.get(cStr[0]), suitMap.get(cStr[1])
         return None, None
 
+    def advanceTurn(self, currentPlayer=None):
+        if currentPlayer is None:
+            currentPlayer = self.playerWithTurn
+        teammates = [p for p in self.players
+                     if p.team == currentPlayer.team and p != currentPlayer and p.hand]
+        if teammates:
+            self.playerWithTurn = random.choice(teammates)
+            return
+        opponents = [p for p in self.players
+                     if p.team != currentPlayer.team and p.hand]
+        if opponents:
+            self.playerWithTurn = random.choice(opponents)
+            return
+        if self.winner is None:
+            scores = [t.setsTaken for t in self.teams]
+            def teamKey(t):
+                return t.setsTaken
+            self.winner = "tied" if scores[0] == scores[1] else max(self.teams, key=teamKey)
+
+    def advanceTurnIfNeeded(self):
+        if self.playerWithTurn.hand:
+            return
+        self.advanceTurn()
+
     def resolveSet(self, setName, teamIdx, source="auto"):
         if setName in self.completedSets:
             return
@@ -109,9 +153,11 @@ class LiteratureGame:
         print(f"[{source.upper()}] Team {teamIdx} took {setName}")
         for card in self.publicInfo[setName]:
             self.publicInfo[setName][card] = set()
+            for p in self.players:
+                p.hand.discard(card)
         if self.teams[teamIdx].setsTaken > 4:
             self.winner = self.teams[teamIdx]
-
+    # Me again
     def applyMove(self, ask):
         card  = ask.card
         s     = card.set
@@ -131,11 +177,11 @@ class LiteratureGame:
         for possible in self.publicInfo[s].values():
             playersInSet |= possible
 
-        for i, team in enumerate(self.teams):
-            if not any(p in playersInSet for p in team.players):
-                self.resolveSet(s, 1 - i, source="auto")
+        for teamIdx in range(len(self.teams)):
+            if not any(p in playersInSet for p in self.teams[teamIdx].players):
+                self.resolveSet(s, 1 - teamIdx, source="auto")
                 break
-
+    # Me
     def recordMove(self, ask):
         if ask is None:
             return

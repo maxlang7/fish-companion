@@ -1,5 +1,6 @@
 from constants import valueMap, suitMap
 
+# Whole file me with AI just so I didn't type out "two", 'three', etc
 class Card:
     digitToWord = {
         '1': 'ace', '2': 'two', '3': 'three', '4': 'four', '5': 'five',
@@ -43,10 +44,11 @@ class Card:
 
 class Player:
     def __init__(self, name, team, isBot=False):
-        self.name  = name
-        self.team  = team
-        self.isBot = isBot
-        self.hand  = set()
+        self.name         = name
+        self.team         = team
+        self.isBot        = isBot
+        self.hand         = set()
+        self.wantsTheTurn = False
 
     def __repr__(self):
         return f"{self.name}{' (Bot)' if self.isBot else ''}"

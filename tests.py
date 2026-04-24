@@ -1,3 +1,4 @@
+# Framework is AI generated but I told it exactly what asks to test against
 def get_test_cases():
     """
     Returns a dictionary of test cases.
@@ -27,10 +28,6 @@ def get_test_cases():
             ('move', 0, 0, 'three', 'hearts', True) # Max asks Max (Illegal!)
         ],
         'exhaust_set': [
-            # Max starts with nothing in his set, we need to systematically prove he has NOTHING.
-            # Low Hearts: two, three, four, five, six, seven
-            # Alex (1) asks Max (0) for each one, Max says no.
-            # Turn order: 1->0 (fail) -> Turn goes to 0. 0->1 (fail) -> Turn to 1.
             ('move', 1, 0, 'two', 'hearts', False),   # Alex asks Max (No). Turn to Max.
             ('move', 0, 1, 'ace', 'spades', False),   # Max asks Alex (No). Turn to Alex.
             ('move', 1, 0, 'three', 'hearts', False), # Alex asks Max (No). Turn to Max.
