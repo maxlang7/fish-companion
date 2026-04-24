@@ -82,6 +82,34 @@ know could have a card. Bot strategy priority:
   Bots set a "wants the turn" flag when they know all card locations in a set
   and at least one is held by an opponent — signaling a teammate to pass them
   the turn after declaring.
+
+GAME LOGGING
+------------
+Every move in a live game is automatically logged to the games/ directory as a
+timestamped .txt file (e.g. games/2025-04-24_game_1.txt). Each line records the
+time and a human-readable description of the ask. Logging is disabled during
+tests and deal-mode setup games.
+
+TESTING FRAMEWORK
+-----------------
+Run:  python main.py test
+
+Tests live in tests.py and are defined as sequences of two action types:
+  ('seed', player_idx, value, suit)      — force a card into publicInfo as known
+  ('move', asker_idx, asked_idx, value, suit, got) — simulate an ask
+
+Test cases cover:
+  duplicate     — asking for a card you already have is rejected
+  empty_set     — asking when publicInfo has no info yet is allowed
+  simple_success — a valid ask succeeds and the card transfers
+  simple_fail    — a failed ask passes the turn correctly
+  ask_self       — asking yourself is rejected
+  exhaust_set    — after all cards in a set are proven absent from a player,
+                   asking that player for another card in the set is rejected
+  take_set       — acquiring all 6 cards in a set triggers automatic set resolution
+
+To run a single named test:  python main.py <test_name>
+  e.g.  python main.py take_set
 """
 
 from cmu_graphics import *
