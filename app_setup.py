@@ -160,6 +160,7 @@ class AppSetup:
         gameState = AppSetup.buildGame(names, {}, doLog=True, shuffle=True)
         AppSetup.applyCommonState(app, gameState, "game")
         app.isVsBots = True
+        app.stepDelay = 0
 
     @staticmethod
     def startGame(app, humanCount=1):
